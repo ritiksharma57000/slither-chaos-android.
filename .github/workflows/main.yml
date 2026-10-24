@@ -49,6 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           wget -q \
             https://github.com/godotengine/godot-builds/releases/download/3.5.3-stable/Godot_v3.5.3-stable_linux_headless.64.zip \
             -O /tmp/godot.zip
@@ -56,9 +57,11 @@ jobs:
           mkdir -p /tmp/godot
           unzip -o /tmp/godot.zip -d /tmp/godot
 
-          GODOT_BIN="$(find /tmp/godot -type f -name 'godot*' -perm /111 -print -quit)"
+          GODOT_BIN="$(find /tmp/godot -type f -name 'Godot_v3.5.3-stable_linux_headless.64' -print -quit)"
+
           if [ -z "$GODOT_BIN" ]; then
             echo "ERROR: Godot executable not found."
+            find /tmp/godot -maxdepth 3 -type f
             exit 1
           fi
 
@@ -70,6 +73,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           wget -q \
             https://github.com/godotengine/godot-builds/releases/download/3.5.3-stable/Godot_v3.5.3-stable_export_templates.tpz \
             -O /tmp/templates.tpz
@@ -78,8 +82,9 @@ jobs:
           unzip -o /tmp/templates.tpz -d /tmp/templates
 
           TEMPLATE_SOURCE="$(find /tmp/templates -type f -name 'android_debug.apk' -print -quit)"
+
           if [ -z "$TEMPLATE_SOURCE" ]; then
-            echo "ERROR: Android debug export template not found."
+            echo "ERROR: Android export template not found."
             find /tmp/templates -maxdepth 4 -type f
             exit 1
           fi
@@ -107,6 +112,7 @@ jobs:
           fi
 
           mkdir -p "$HOME/.config/godot"
+
           cat > "$HOME/.config/godot/editor_settings-3.tres" <<EOF
           [gd_resource type="EditorSettings" format=2]
 
@@ -121,6 +127,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           cd "$GODOT_PROJECT_DIR"
 
           echo "Checking Android preset..."
@@ -131,7 +138,7 @@ jobs:
           echo "Importing project resources..."
           "$GODOT_BIN" --path "$GODOT_PROJECT_DIR" --editor --headless --quit
 
-          echo "Checking project after import..."
+          echo "Checking project..."
           "$GODOT_BIN" --path "$GODOT_PROJECT_DIR" --headless --quit
 
       - name: Export Android APK
@@ -147,7 +154,7 @@ jobs:
             "$GODOT_PROJECT_DIR/build/SlitherChaos.apk"
 
           test -s "$GODOT_PROJECT_DIR/build/SlitherChaos.apk"
-          echo "APK export completed."
+          echo "APK created successfully."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
