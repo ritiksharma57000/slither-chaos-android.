@@ -5,24 +5,30 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Download project ZIP
+      - name: Download project
         uses: actions/checkout@v4
 
       - name: Extract Godot project
         run: |
           unzip -o Slither_Chaos_Premium_UI.zip -d game
-          ls -la game
+          find game -name project.godot
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-31" "build-tools;30.0.3"
 
       - name: Build Android APK
-        uses: firebelley/godot-export@v6
+        uses: firebelley/godot-export@v6.0.0
         with:
-          godot_version: 3.5.3
-          godot_export_template_version: 3.5.3.stable
+          godot_executable_download_url: https://downloads.tuxfamily.org/godotengine/3.5.3/Godot_v3.5.3-stable_linux_headless.64.zip
+          godot_export_templates_download_url: https://downloads.tuxfamily.org/godotengine/3.5.3/Godot_v3.5.3-stable_export_templates.tpz
           relative_project_path: game
-          archive_output: true
+          use_godot_3: true
           export_debug: true
-          presets: Android
           
