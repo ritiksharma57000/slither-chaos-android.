@@ -1,0 +1,28 @@
+name: Build Slither Chaos APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download project ZIP
+        uses: actions/checkout@v4
+
+      - name: Extract Godot project
+        run: |
+          unzip -o Slither_Chaos_Premium_UI.zip -d game
+          ls -la game
+
+      - name: Build Android APK
+        uses: firebelley/godot-export@v6
+        with:
+          godot_version: 3.5.3
+          godot_export_template_version: 3.5.3.stable
+          relative_project_path: game
+          archive_output: true
+          export_debug: true
+          presets: Android
+          
