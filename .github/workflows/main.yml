@@ -12,10 +12,22 @@ jobs:
       - name: Download project
         uses: actions/checkout@v4
 
-      - name: Extract Godot project
+      - name: Extract and locate project
         run: |
           unzip -o Slither_Chaos_Premium_UI.zip -d game
-          find game -name project.godot
+          PROJECT_FILE="$(find game -name project.godot -type f -print -quit)"
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "ERROR: project.godot was not found."
+            exit 1
+          fi
+          PROJECT_DIR="$(dirname "$PROJECT_FILE")"
+          echo "Godot project folder: $PROJECT_DIR"
+          ls -la "$PROJECT_DIR"
+          if [ ! -f "$PROJECT_DIR/export_presets.cfg" ]; then
+            echo "ERROR: export_presets.cfg is missing from the project folder."
+            exit 1
+          fi
+          echo "GODOT_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -35,7 +47,8 @@ jobs:
         with:
           godot_executable_download_url: https://downloads.tuxfamily.org/godotengine/3.5.3/Godot_v3.5.3-stable_linux_headless.64.zip
           godot_export_templates_download_url: https://downloads.tuxfamily.org/godotengine/3.5.3/Godot_v3.5.3-stable_export_templates.tpz
-          relative_project_path: game
+          relative_project_path: ${{ env.GODOT_PROJECT_DIR }}
           use_godot_3: true
           export_debug: true
+          archive_output: true
           
