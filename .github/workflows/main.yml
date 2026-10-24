@@ -16,7 +16,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           unzip -o Slither_Chaos_Premium_UI.zip -d game
 
           PROJECT_FILE="$(find game -name project.godot -type f -print -quit)"
@@ -34,11 +33,11 @@ jobs:
           echo "GODOT_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
 
-      - name: Set up Java 17
+      - name: Set up Java 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '11'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
@@ -104,7 +103,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           mkdir -p "$HOME/.android"
 
           if [ ! -f "$HOME/.android/debug.keystore" ]; then
@@ -141,15 +139,13 @@ jobs:
           grep -n '^name="Android"' "$GODOT_PROJECT_DIR/export_presets.cfg"
           grep -n '^platform="Android"' "$GODOT_PROJECT_DIR/export_presets.cfg"
 
-          echo "Checking audio file..."
+          echo "Checking pickup audio..."
           ls -l "$GODOT_PROJECT_DIR/assets/audio/pickup.wav"
 
-          echo "Importing resources..."
+          echo "Importing project resources..."
           "$GODOT_BIN" \
             --path "$GODOT_PROJECT_DIR" \
-            --editor --headless --quit || true
-
-          echo "Resource import step finished."
+            --editor --headless --quit
 
       - name: Export Android APK
         shell: bash
@@ -158,6 +154,9 @@ jobs:
 
           mkdir -p "$GODOT_PROJECT_DIR/build"
           LOG_FILE="$RUNNER_TEMP/godot-export.log"
+
+          echo "Java version:"
+          java -version 2>&1
 
           echo "Starting verbose Android APK export..."
 
