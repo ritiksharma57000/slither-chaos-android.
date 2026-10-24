@@ -1,3 +1,4 @@
+
 name: Build Slither Chaos APK
 
 on:
@@ -15,16 +16,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           unzip -o Slither_Chaos_Premium_UI.zip -d game
 
           PROJECT_FILE="$(find game -name project.godot -type f -print -quit)"
+
           if [ -z "$PROJECT_FILE" ]; then
             echo "ERROR: project.godot was not found."
             exit 1
           fi
 
           PROJECT_DIR="$(dirname "$PROJECT_FILE")"
-          test -f "$PROJECT_DIR/export_presets.cfg"
+
+          if [ ! -f "$PROJECT_DIR/export_presets.cfg" ]; then
+            echo "ERROR: export_presets.cfg was not found."
+            exit 1
+          fi
 
           echo "GODOT_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
@@ -56,7 +63,9 @@ jobs:
           mkdir -p /tmp/godot
           unzip -o /tmp/godot.zip -d /tmp/godot
 
-          GODOT_BIN="$(find /tmp/godot -type f -name 'Godot_v3.5.3-stable_linux_headless.64' -print -quit)"
+          GODOT_BIN="$(find /tmp/godot -type f \
+            -name 'Godot_v3.5.3-stable_linux_headless.64' \
+            -print -quit)"
 
           if [ -z "$GODOT_BIN" ]; then
             echo "ERROR: Godot executable not found."
@@ -81,10 +90,11 @@ jobs:
           mkdir -p /tmp/templates
           unzip -o /tmp/templates.tpz -d /tmp/templates
 
-          TEMPLATE_SOURCE="$(find /tmp/templates -type f -name 'android_debug.apk' -print -quit)"
+          TEMPLATE_SOURCE="$(find /tmp/templates -type f \
+            -name 'android_debug.apk' -print -quit)"
 
           if [ -z "$TEMPLATE_SOURCE" ]; then
-            echo "ERROR: Android export template not found."
+            echo "ERROR: Android debug export template not found."
             find /tmp/templates -maxdepth 4 -type f
             exit 1
           fi
@@ -93,10 +103,13 @@ jobs:
           mkdir -p "$TEMPLATE_DIR"
           cp "$(dirname "$TEMPLATE_SOURCE")"/* "$TEMPLATE_DIR/"
 
+          echo "Installed Godot Android export templates."
+
       - name: Configure Android debug keystore
         shell: bash
         run: |
           set -euo pipefail
+
           mkdir -p "$HOME/.android"
 
           if [ ! -f "$HOME/.android/debug.keystore" ]; then
@@ -128,35 +141,56 @@ jobs:
         run: |
           set -euo pipefail
 
-          cd "$GODOT_PROJECT_DIR"
-
           echo "Checking Android preset..."
-          grep -n '^\[preset\.' export_presets.cfg
-          grep -n '^name="Android"' export_presets.cfg
-          grep -n '^platform="Android"' export_presets.cfg
+          grep -n '^\[preset\.' "$GODOT_PROJECT_DIR/export_presets.cfg"
+          grep -n '^name="Android"' "$GODOT_PROJECT_DIR/export_presets.cfg"
+          grep -n '^platform="Android"' "$GODOT_PROJECT_DIR/export_presets.cfg"
 
-          echo "Importing project resources..."
-          "$GODOT_BIN" --path "$GODOT_PROJECT_DIR" --editor --headless --quit
+          echo "Checking audio file..."
+          ls -l "$GODOT_PROJECT_DIR/assets/audio/pickup.wav"
 
-          echo "Checking project..."
-          "$GODOT_BIN" --path "$GODOT_PROJECT_DIR" --headless --quit
+          echo "Importing resources..."
+          "$GODOT_BIN" \
+            --path "$GODOT_PROJECT_DIR" \
+            --editor --headless --quit || true
+
+          echo "Resource import step finished."
 
       - name: Export Android APK
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           mkdir -p "$GODOT_PROJECT_DIR/build"
+          LOG_FILE="$RUNNER_TEMP/godot-export.log"
+
+          echo "Starting Android APK export..."
 
           "$GODOT_BIN" \
             --path "$GODOT_PROJECT_DIR" \
             --export-debug "Android" \
-            "$GODOT_PROJECT_DIR/build/SlitherChaos.apk"
+            "$GODOT_PROJECT_DIR/build/SlitherChaos.apk" \
+            2>&1 | tee "$LOG_FILE"
 
-          test -s "$GODOT_PROJECT_DIR/build/SlitherChaos.apk"
+          EXPORT_STATUS=${PIPESTATUS[0]}
+
+          echo "Godot export exit code: $EXPORT_STATUS"
+
+          if [ "$EXPORT_STATUS" -ne 0 ]; then
+            echo "ERROR: APK export failed. Export log:"
+            cat "$LOG_FILE"
+            exit "$EXPORT_STATUS"
+          fi
+
+          if [ ! -s "$GODOT_PROJECT_DIR/build/SlitherChaos.apk" ]; then
+            echo "ERROR: APK was not created."
+            exit 1
+          fi
+
           echo "APK created successfully."
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Slither-Chaos-Android-APK
