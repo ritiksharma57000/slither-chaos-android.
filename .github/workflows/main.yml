@@ -1,3 +1,4 @@
+
 name: Build Slither Chaos APK
 
 on:
@@ -15,6 +16,12 @@ jobs:
         run: |
           unzip -o Slither_Chaos_Premium_UI.zip -d game
           find game -name project.godot
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
