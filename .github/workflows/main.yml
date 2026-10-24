@@ -51,4 +51,5 @@ jobs:
           use_godot_3: true
           export_debug: true
           archive_output: true
+          presets_to_export: Android
           
