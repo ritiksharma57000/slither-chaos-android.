@@ -20,14 +20,12 @@ jobs:
           unzip -o Slither_Chaos_Premium_UI.zip -d game
 
           PROJECT_FILE="$(find game -name project.godot -type f -print -quit)"
-
           if [ -z "$PROJECT_FILE" ]; then
             echo "ERROR: project.godot was not found."
             exit 1
           fi
 
           PROJECT_DIR="$(dirname "$PROJECT_FILE")"
-
           if [ ! -f "$PROJECT_DIR/export_presets.cfg" ]; then
             echo "ERROR: export_presets.cfg was not found."
             exit 1
@@ -75,7 +73,6 @@ jobs:
 
           chmod +x "$GODOT_BIN"
           echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
-
           "$GODOT_BIN" --version || true
 
       - name: Install Godot export templates
@@ -102,8 +99,6 @@ jobs:
           TEMPLATE_DIR="$HOME/.local/share/godot/templates/3.5.3.stable"
           mkdir -p "$TEMPLATE_DIR"
           cp "$(dirname "$TEMPLATE_SOURCE")"/* "$TEMPLATE_DIR/"
-
-          echo "Installed Godot Android export templates."
 
       - name: Configure Android debug keystore
         shell: bash
@@ -164,20 +159,20 @@ jobs:
           mkdir -p "$GODOT_PROJECT_DIR/build"
           LOG_FILE="$RUNNER_TEMP/godot-export.log"
 
-          echo "Starting Android APK export..."
+          echo "Starting verbose Android APK export..."
 
           "$GODOT_BIN" \
+            --verbose \
             --path "$GODOT_PROJECT_DIR" \
             --export-debug "Android" \
             "$GODOT_PROJECT_DIR/build/SlitherChaos.apk" \
             2>&1 | tee "$LOG_FILE"
 
           EXPORT_STATUS=${PIPESTATUS[0]}
-
           echo "Godot export exit code: $EXPORT_STATUS"
 
           if [ "$EXPORT_STATUS" -ne 0 ]; then
-            echo "ERROR: APK export failed. Export log:"
+            echo "ERROR: APK export failed. Full log follows:"
             cat "$LOG_FILE"
             exit "$EXPORT_STATUS"
           fi
