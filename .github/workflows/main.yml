@@ -13,21 +13,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract and locate project
+        shell: bash
         run: |
+          set -euo pipefail
           unzip -o Slither_Chaos_Premium_UI.zip -d game
+
           PROJECT_FILE="$(find game -name project.godot -type f -print -quit)"
           if [ -z "$PROJECT_FILE" ]; then
             echo "ERROR: project.godot was not found."
             exit 1
           fi
+
           PROJECT_DIR="$(dirname "$PROJECT_FILE")"
-          echo "Godot project folder: $PROJECT_DIR"
-          ls -la "$PROJECT_DIR"
-          if [ ! -f "$PROJECT_DIR/export_presets.cfg" ]; then
-            echo "ERROR: export_presets.cfg is missing from the project folder."
-            exit 1
-          fi
+          test -f "$PROJECT_DIR/export_presets.cfg"
+
           echo "GODOT_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project directory: $PROJECT_DIR"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -39,17 +40,119 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Install Android packages
+        shell: bash
         run: |
+          set -euo pipefail
           sdkmanager "platform-tools" "platforms;android-31" "build-tools;30.0.3"
 
-      - name: Build Android APK
-        uses: firebelley/godot-export@v6.0.0
+      - name: Download Godot 3.5.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          wget -q \
+            https://github.com/godotengine/godot-builds/releases/download/3.5.3-stable/Godot_v3.5.3-stable_linux_headless.64.zip \
+            -O /tmp/godot.zip
+
+          mkdir -p /tmp/godot
+          unzip -o /tmp/godot.zip -d /tmp/godot
+
+          GODOT_BIN="$(find /tmp/godot -type f -name 'godot*' -perm /111 -print -quit)"
+          if [ -z "$GODOT_BIN" ]; then
+            echo "ERROR: Godot executable not found."
+            exit 1
+          fi
+
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+          "$GODOT_BIN" --version
+
+      - name: Install Godot export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          wget -q \
+            https://github.com/godotengine/godot-builds/releases/download/3.5.3-stable/Godot_v3.5.3-stable_export_templates.tpz \
+            -O /tmp/templates.tpz
+
+          mkdir -p /tmp/templates
+          unzip -o /tmp/templates.tpz -d /tmp/templates
+
+          TEMPLATE_SOURCE="$(find /tmp/templates -type f -name 'android_debug.apk' -print -quit)"
+          if [ -z "$TEMPLATE_SOURCE" ]; then
+            echo "ERROR: Android debug export template not found."
+            find /tmp/templates -maxdepth 4 -type f
+            exit 1
+          fi
+
+          TEMPLATE_DIR="$HOME/.local/share/godot/templates/3.5.3.stable"
+          mkdir -p "$TEMPLATE_DIR"
+          cp "$(dirname "$TEMPLATE_SOURCE")"/* "$TEMPLATE_DIR/"
+
+      - name: Configure Android debug keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-3.tres" <<EOF
+          [gd_resource type="EditorSettings" format=2]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_SDK_ROOT"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+
+      - name: Import Godot project resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GODOT_PROJECT_DIR"
+
+          echo "Checking Android preset..."
+          grep -n '^\[preset\.' export_presets.cfg
+          grep -n '^name="Android"' export_presets.cfg
+          grep -n '^platform="Android"' export_presets.cfg
+
+          echo "Importing project resources..."
+          "$GODOT_BIN" --path "$GODOT_PROJECT_DIR" --editor --headless --quit
+
+          echo "Checking project after import..."
+          "$GODOT_BIN" --path "$GODOT_PROJECT_DIR" --headless --quit
+
+      - name: Export Android APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$GODOT_PROJECT_DIR/build"
+
+          "$GODOT_BIN" \
+            --path "$GODOT_PROJECT_DIR" \
+            --export-debug "Android" \
+            "$GODOT_PROJECT_DIR/build/SlitherChaos.apk"
+
+          test -s "$GODOT_PROJECT_DIR/build/SlitherChaos.apk"
+          echo "APK export completed."
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          godot_executable_download_url: https://github.com/godotengine/godot-builds/releases/download/3.5.3-stable/Godot_v3.5.3-stable_linux_headless.64.zip
-          godot_export_templates_download_url: https://github.com/godotengine/godot-builds/releases/download/3.5.3-stable/Godot_v3.5.3-stable_export_templates.tpz
-          relative_project_path: ${{ env.GODOT_PROJECT_DIR }}
-          use_godot_3: true
-          export_debug: true
-          archive_output: true
-          presets_to_export: Android
+          name: Slither-Chaos-Android-APK
+          path: ${{ env.GODOT_PROJECT_DIR }}/build/SlitherChaos.apk
+          if-no-files-found: error
           
